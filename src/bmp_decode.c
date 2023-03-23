@@ -62,112 +62,57 @@ void bmp_decode_close(BMP_DECODE_HANDLE* bmp) {
 //
 //  half size decode
 //
-static int32_t bmp_decode_exec_half(BMP_DECODE_HANDLE* bmp, FILE* fp) {
+static int32_t bmp_decode_exec_half(BMP_DECODE_HANDLE* bmp, uint8_t* bmp_buffer, size_t bmp_buffer_bytes) {
 
   int32_t rc = -1;
-/*
-  uint32_t jpeg_buffer_meta[3];
-  jpeg_buffer_meta[0] = (uint32_t)jpeg_buffer;
-  jpeg_buffer_meta[1] = jpeg_buffer_bytes;
-  jpeg_buffer_meta[2] = 0;
 
-  pjpeg_image_info_t image_info = { 0 };
-  int32_t rc = pjpeg_decode_init(&image_info, pjpeg_need_bytes_callback, jpeg_buffer_meta, 0);
-  if (rc != 0) {
-    goto exit;
-  }
+  if (bmp_buffer[0] != 0x42 || bmp_buffer[1] != 0x4d) goto exit;
 
-  int32_t ofs_y = ( 512 - image_info.m_height / 2 ) / 2;
-  int32_t ofs_x = jpeg->extended_graphic ? ( 768 - image_info.m_width / 2 ) / 2 : ( 512 - image_info.m_width / 2 ) / 2;
+  int32_t bmp_width  = bmp_buffer[18] + (bmp_buffer[19] << 8) + (bmp_buffer[20] << 16) + (bmp_buffer[21] << 24);
+  int32_t bmp_height = bmp_buffer[22] + (bmp_buffer[23] << 8) + (bmp_buffer[24] << 16) + (bmp_buffer[25] << 24);
 
-  int32_t mcu_y = 0;
-  int32_t mcu_x = 0;
+  int32_t bmp_bit_depth = bmp_buffer[28] + (bmp_buffer[29] << 8);
+  if (bmp_bit_depth != 24) goto exit;
+  
+  int32_t ofs_y = ( 512 - bmp_height/2 ) / 2;
+  int32_t ofs_x = bmp->extended_graphic ? ( 768 - bmp_width/2 ) / 2 : ( 512 - bmp_width/2 ) / 2;
 
-  int32_t pitch = jpeg->extended_graphic ? 1024 : 512;
-  int32_t xmax = jpeg->extended_graphic ? 767 : 511;
+  int32_t pitch = bmp->extended_graphic ? 1024 : 512;
+  int32_t xmax = bmp->extended_graphic ? 767 : 511;
 
-  for (;;) {
+  uint8_t* bmp_bitmap = bmp_buffer + 54;
 
-    uint8_t status = pjpeg_decode_mcu();
-    if (status == PJPG_NO_MORE_BLOCKS) {
+  for (int32_t y = bmp_height-1; y >= 0; y--) {
+  
+    int32_t cy = ofs_y + y/2;
+    if (cy < 0) {
+      //bmp_bitmap += 3 * bmp_width;
+      //continue;
       break;
-    } else if (status != 0) {
-      rc = status;
-      goto exit;
     }
-    if (mcu_y >= image_info.m_MCUSPerCol) {
-      goto exit;
+    if (cy & 0x0001 || cy > 511) {
+      bmp_bitmap += 3 * bmp_width;
+      continue;
     }
 
-    for (int32_t y = 0; y < image_info.m_MCUHeight; y += 8) {
+    uint16_t* gvram = GVRAM + cy * pitch / 2;
 
-      const int by_limit = min(8, image_info.m_height - (mcu_y * image_info.m_MCUHeight + y));
+    for (int32_t x = 0; x < bmp_width; x++) {
 
-      for (int32_t x = 0; x < image_info.m_MCUWidth; x += 8) {
-
-        uint8_t src_ofs = (x * 8U) + (y * 16U);
-        const uint8_t *pSrcR = image_info.m_pMCUBufR + src_ofs;
-        const uint8_t *pSrcG = image_info.m_pMCUBufG + src_ofs;
-        const uint8_t *pSrcB = image_info.m_pMCUBufB + src_ofs;
-
-        const int16_t bx_limit = min(8, image_info.m_width - (mcu_x * image_info.m_MCUWidth + x));
-
-        for (int16_t by = 0; by < by_limit; by++) {
-
-          if (by & 0x0001) {
-            pSrcR += 8;
-            pSrcG += 8;
-            pSrcB += 8;
-            continue;
-          }
-
-          int32_t gy = ofs_y + (mcu_y * image_info.m_MCUHeight + y + by)/2;
-          if (gy > 511) {
-            break;
-          } else if (gy < 0) {
-            pSrcR += 8;
-            pSrcG += 8;
-            pSrcB += 8;
-            continue;
-          }
-
-          uint16_t* gvram = &(GVRAM[ gy * pitch ]);
-          int32_t gx = ofs_x + (mcu_x * image_info.m_MCUWidth + x)/2;
-          
-          for (int16_t bx = 0; bx < bx_limit; bx++) {
-            if (bx & 0x0001) {
-              pSrcR++;
-              pSrcG++;
-              pSrcB++;
-              continue;
-            }
-            if (gx < 0 || gx > xmax) {
-              pSrcR++;
-              pSrcG++;
-              pSrcB++;
-            } else {
-              uint8_t r = *pSrcR++;
-              uint8_t g = *pSrcG++;
-              uint8_t b = *pSrcB++;
-              gvram[ gx ] = jpeg->rgb555_g[ g ] | jpeg->rgb555_r[ r ] | jpeg->rgb555_b[ b ] | 1;
-            }
-            gx++;
-          }
-
-          pSrcR += (8 - bx_limit);
-          pSrcG += (8 - bx_limit);
-          pSrcB += (8 - bx_limit);
-        }
+      int32_t cx = ofs_x + x/2;
+      if (cx < 0 || cx > xmax || cx & 0x0001) {
+        bmp_bitmap += 3;
+        continue;
       }
-    }
 
-    if (++mcu_x == image_info.m_MCUSPerRow) {
-      mcu_x = 0;
-      mcu_y++;
-    }
+      uint8_t b = *bmp_bitmap++;
+      uint8_t g = *bmp_bitmap++;
+      uint8_t r = *bmp_bitmap++;
+      gvram[ cx ] = bmp->rgb555_g[ g ] | bmp->rgb555_r[ r ] | bmp->rgb555_b[ b ] | 1;
 
+    }
   }
-*/
+
   rc = 0;
 
 exit:
@@ -178,105 +123,61 @@ exit:
 //
 //  normal size decode
 //
-int32_t bmp_decode_exec(BMP_DECODE_HANDLE* bmp, FILE* fp) {
+int32_t bmp_decode_exec(BMP_DECODE_HANDLE* bmp, uint8_t* bmp_buffer, size_t bmp_buffer_bytes) {
 
   if (bmp->half_size) {
-    return bmp_decode_exec_half(bmp, fp);
+    return bmp_decode_exec_half(bmp, bmp_buffer, bmp_buffer_bytes);
   }
 
   int32_t rc = -1;
 
-/*
-  uint32_t jpeg_buffer_meta[3];
-  jpeg_buffer_meta[0] = (uint32_t)jpeg_buffer;
-  jpeg_buffer_meta[1] = jpeg_buffer_bytes;
-  jpeg_buffer_meta[2] = 0;
+  if (bmp_buffer[0] != 0x42 || bmp_buffer[1] != 0x4d) goto exit;
 
-  pjpeg_image_info_t image_info = { 0 };
-  int32_t rc = pjpeg_decode_init(&image_info, pjpeg_need_bytes_callback, jpeg_buffer_meta, 0);
-  if (rc != 0) {
-    goto exit;
-  }
+  int32_t bmp_width  = bmp_buffer[18] + (bmp_buffer[19] << 8) + (bmp_buffer[20] << 16) + (bmp_buffer[21] << 24);
+  int32_t bmp_height = bmp_buffer[22] + (bmp_buffer[23] << 8) + (bmp_buffer[24] << 16) + (bmp_buffer[25] << 24);
 
-  int32_t ofs_y = ( 512 - image_info.m_height ) / 2;
-  int32_t ofs_x = jpeg->extended_graphic ? ( 768 - image_info.m_width ) / 2 : ( 512 - image_info.m_width ) / 2;
+  int32_t bmp_bit_depth = bmp_buffer[28] + (bmp_buffer[29] << 8);
+  if (bmp_bit_depth != 24) goto exit;
+  
+  int32_t ofs_y = ( 512 - bmp_height ) / 2;
+  int32_t ofs_x = bmp->extended_graphic ? ( 768 - bmp_width ) / 2 : ( 512 - bmp_width ) / 2;
 
-  int32_t mcu_y = 0;
-  int32_t mcu_x = 0;
+  int32_t pitch = bmp->extended_graphic ? 1024 : 512;
+  int32_t xmax = bmp->extended_graphic ? 767 : 511;
 
-  int32_t pitch = jpeg->extended_graphic ? 1024 : 512;
-  int32_t xmax = jpeg->extended_graphic ? 767 : 511;
+  uint8_t* bmp_bitmap = bmp_buffer + 54;
 
-  for (;;) {
-
-    uint8_t status = pjpeg_decode_mcu();
-    if (status == PJPG_NO_MORE_BLOCKS) {
+  for (int32_t y = bmp_height-1; y >= 0; y--) {
+  
+    int32_t cy = ofs_y + y;
+    if (cy < 0) {
+      //bmp_bitmap += 3 * bmp_width;
+      //continue;
       break;
-    } else if (status != 0) {
-      rc = status;
-      goto exit;
     }
-    if (mcu_y >= image_info.m_MCUSPerCol) {
-      goto exit;
+    if (cy > 511) {
+      bmp_bitmap += 3 * bmp_width;
+      continue;
     }
 
-    for (int32_t y = 0; y < image_info.m_MCUHeight; y += 8) {
+    uint16_t* gvram = GVRAM + cy * pitch;
 
-      const int by_limit = min(8, image_info.m_height - (mcu_y * image_info.m_MCUHeight + y));
+    for (int32_t x = 0; x < bmp_width; x++) {
 
-      for (int32_t x = 0; x < image_info.m_MCUWidth; x += 8) {
-
-        uint8_t src_ofs = (x * 8U) + (y * 16U);
-        const uint8_t* pSrcR = image_info.m_pMCUBufR + src_ofs;
-        const uint8_t* pSrcG = image_info.m_pMCUBufG + src_ofs;
-        const uint8_t* pSrcB = image_info.m_pMCUBufB + src_ofs;
-
-        const int16_t bx_limit = min(8, image_info.m_width - (mcu_x * image_info.m_MCUWidth + x));
-
-        for (int16_t by = 0; by < by_limit; by++) {
-
-          int32_t gy = ofs_y + mcu_y * image_info.m_MCUHeight + y + by;
-          if (gy > 511) {
-            goto end;
-          } else if (gy < 0) {
-            pSrcR += 8;
-            pSrcG += 8;
-            pSrcB += 8;
-            continue;
-          }
-
-          uint16_t* gvram = &(GVRAM[ gy * pitch ]);
-          int32_t gx = ofs_x + mcu_x * image_info.m_MCUWidth + x;
-
-          for (int16_t bx = 0; bx < bx_limit; bx++) {
-            if (gx < 0 || gx > xmax) {
-              pSrcR++;
-              pSrcG++;
-              pSrcB++;
-            } else {
-              uint8_t r = *pSrcR++;
-              uint8_t g = *pSrcG++;
-              uint8_t b = *pSrcB++;
-              gvram[ gx ] = jpeg->rgb555_g[ g ] | jpeg->rgb555_r[ r ] | jpeg->rgb555_b[ b ] | 1;
-            }
-            gx++;
-          }
-
-          pSrcR += (8 - bx_limit);
-          pSrcG += (8 - bx_limit);
-          pSrcB += (8 - bx_limit);
-        }
+      int32_t cx = ofs_x + x;
+      if (cx < 0 || cx > xmax) {
+        bmp_bitmap += 3;
+        continue;
       }
-    }
 
-    if (++mcu_x == image_info.m_MCUSPerRow) {
-      mcu_x = 0;
-      mcu_y++;
-    }
+      uint8_t b = *bmp_bitmap++;
+      uint8_t g = *bmp_bitmap++;
+      uint8_t r = *bmp_bitmap++;
+      gvram[ cx ] = bmp->rgb555_g[ g ] | bmp->rgb555_r[ r ] | bmp->rgb555_b[ b ] | 1;
 
+    }
   }
-end:
-*/
+
   rc = 0;
 
 exit:

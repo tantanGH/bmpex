@@ -90,13 +90,42 @@ int32_t main(int32_t argc, uint8_t* argv[]) {
     show_help_message();
     goto exit;
   }
+  
+  fp = fopen(file_name, "rb");
+  if (fp == NULL) {
+    printf("error: failed to open file: %s\n", file_name);
+    goto exit;
+  }
+
+  fseek(fp, 0, SEEK_END);
+  size_t file_size = ftell(fp);
+  fseek(fp, 0, SEEK_SET);
+
+  file_data = (uint8_t*)himem_malloc(file_size, 0);
+  if (file_data == NULL) {
+    printf("error: out of memory.\n");
+    goto exit;
+  }
+
+  size_t read_len = 0;
+  do {
+    size_t len = fread(file_data + read_len, 1, file_size - read_len, fp);
+    if (len == 0) break;
+    read_len += len;
+  } while (read_len < file_size);
+  fclose(fp);
+  fp = NULL;
 
   B_SUPER(0);
   C_CUROFF();
 
   if (clear_screen) {
-    G_CLR_ON();
-    C_CLS_AL();      
+    if (extended_graphic) {
+      C_CLS_AL();
+    } else {
+      G_CLR_ON();
+      C_CLS_AL();      
+    }
   }
 
   crtc_set_extra_mode(extended_graphic);
@@ -105,18 +134,18 @@ int32_t main(int32_t argc, uint8_t* argv[]) {
     FILL(&fillptr);
   }
 
-  fp = fopen(file_name, "rb");
- 
   BMP_DECODE_HANDLE bmp_decode = { 0 };
   bmp_decode_init(&bmp_decode, brightness, half_size, extended_graphic);
-  bmp_decode_exec(&bmp_decode, file_data, file_size);
+
+  rc = bmp_decode_exec(&bmp_decode, file_data, file_size);
+  if (rc != 0) {
+    printf("error: BMP decode error. (rc=%d)\n", rc);
+  }
   bmp_decode_close(&bmp_decode);
 
-  C_CURON();
-
-  rc = 0;
-
 exit:
+
+  C_CURON();
 
   if (fp != NULL) {
     fclose(fp);

@@ -16,6 +16,6 @@ typedef struct {
 
 int32_t bmp_decode_init(BMP_DECODE_HANDLE* bmp, int16_t brightness, int16_t half_size, int16_t extended_graphic);
 void bmp_decode_close(BMP_DECODE_HANDLE* bmp);
-int32_t bmp_decode_exec(BMP_DECODE_HANDLE* bmp, FILE* fp);
+int32_t bmp_decode_exec(BMP_DECODE_HANDLE* bmp, uint8_t* bmp_buffer, size_t bmp_buffer_bytes);
 
 #endif
