@@ -1,4 +1,5 @@
-# bmpex
+# BMPEX.X
+
 A simple BMP loader for X680x0/Human68k with XEiJ extended graphic support
 
 シンプルな BMP ローダです。XEiJの拡張グラフィック画面に対応しており、最大で768x512x32768色のBMP画像を表示できます。
