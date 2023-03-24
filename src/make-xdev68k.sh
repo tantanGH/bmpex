@@ -7,7 +7,7 @@ fi
 
 TARGET_FILE="BMPEX.X"
 DOC_FILE="../BMPEX.DOC"
-ZIP_FILE="../../BMPEX011.ZIP"
+ZIP_FILE="../../BMPEX012.ZIP"
 
 CC=${XDEV68K_DIR}/m68k-toolchain/bin/m68k-elf-gcc
 GAS2HAS="${XDEV68K_DIR}/util/x68k_gas2has.pl -cpu 68000 -inc doscall.inc -inc iocscall.inc"
