@@ -83,6 +83,11 @@ static int32_t bmp_decode_exec_half(BMP_DECODE_HANDLE* bmp, uint8_t* bmp_buffer,
   uint8_t* bmp_bitmap = bmp_buffer + 54;
 
   for (int32_t y = bmp_height-1; y >= 0; y--) {
+
+    if (y & 0x0001) {
+      bmp_bitmap += 3 * bmp_width;
+      continue;
+    }
   
     int32_t cy = ofs_y + y/2;
     if (cy < 0) {
@@ -90,17 +95,22 @@ static int32_t bmp_decode_exec_half(BMP_DECODE_HANDLE* bmp, uint8_t* bmp_buffer,
       //continue;
       break;
     }
-    if (cy & 0x0001 || cy > 511) {
+    if (cy > 511) {
       bmp_bitmap += 3 * bmp_width;
       continue;
     }
 
-    uint16_t* gvram = GVRAM + cy * pitch / 2;
+    uint16_t* gvram = GVRAM + cy * pitch;
 
     for (int32_t x = 0; x < bmp_width; x++) {
 
+      if (x & 0x0001) {
+        bmp_bitmap += 3;
+        continue;
+      }
+
       int32_t cx = ofs_x + x/2;
-      if (cx < 0 || cx > xmax || cx & 0x0001) {
+      if (cx < 0 || cx > xmax) {
         bmp_bitmap += 3;
         continue;
       }
