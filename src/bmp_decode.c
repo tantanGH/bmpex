@@ -82,10 +82,12 @@ static int32_t bmp_decode_exec_half(BMP_DECODE_HANDLE* bmp, uint8_t* bmp_buffer,
 
   uint8_t* bmp_bitmap = bmp_buffer + 54;
 
+  size_t padding = (4 - ((bmp_width * 3) % 4)) % 4;
+
   for (int32_t y = bmp_height-1; y >= 0; y--) {
 
     if (y & 0x0001) {
-      bmp_bitmap += 3 * bmp_width;
+      bmp_bitmap += 3 * bmp_width + padding;
       continue;
     }
   
@@ -121,6 +123,8 @@ static int32_t bmp_decode_exec_half(BMP_DECODE_HANDLE* bmp, uint8_t* bmp_buffer,
       gvram[ cx ] = bmp->rgb555_g[ g ] | bmp->rgb555_r[ r ] | bmp->rgb555_b[ b ] | 1;
 
     }
+
+    bmp_bitmap += padding;
   }
 
   rc = 0;
@@ -157,6 +161,8 @@ int32_t bmp_decode_exec(BMP_DECODE_HANDLE* bmp, uint8_t* bmp_buffer, size_t bmp_
 
   uint8_t* bmp_bitmap = bmp_buffer + 54;
 
+  size_t padding = (4 - ((bmp_width * 3) % 4)) % 4;
+
   for (int32_t y = bmp_height-1; y >= 0; y--) {
   
     int32_t cy = ofs_y + y;
@@ -166,7 +172,7 @@ int32_t bmp_decode_exec(BMP_DECODE_HANDLE* bmp, uint8_t* bmp_buffer, size_t bmp_
       break;
     }
     if (cy > 511) {
-      bmp_bitmap += 3 * bmp_width;
+      bmp_bitmap += 3 * bmp_width + padding;
       continue;
     }
 
@@ -186,6 +192,8 @@ int32_t bmp_decode_exec(BMP_DECODE_HANDLE* bmp, uint8_t* bmp_buffer, size_t bmp_
       gvram[ cx ] = bmp->rgb555_g[ g ] | bmp->rgb555_r[ r ] | bmp->rgb555_b[ b ] | 1;
 
     }
+
+    bmp_bitmap += padding;
   }
 
   rc = 0;
