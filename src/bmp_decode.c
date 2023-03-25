@@ -93,12 +93,12 @@ static int32_t bmp_decode_exec_half(BMP_DECODE_HANDLE* bmp, uint8_t* bmp_buffer,
   
     int32_t cy = ofs_y + y/2;
     if (cy < 0) {
-      //bmp_bitmap += 3 * bmp_width;
+      //bmp_bitmap += 3 * bmp_width + padding;
       //continue;
       break;
     }
     if (cy > 511) {
-      bmp_bitmap += 3 * bmp_width;
+      bmp_bitmap += 3 * bmp_width + padding;
       continue;
     }
 
@@ -167,7 +167,7 @@ int32_t bmp_decode_exec(BMP_DECODE_HANDLE* bmp, uint8_t* bmp_buffer, size_t bmp_
   
     int32_t cy = ofs_y + y;
     if (cy < 0) {
-      //bmp_bitmap += 3 * bmp_width;
+      //bmp_bitmap += 3 * bmp_width + padding;
       //continue;
       break;
     }
